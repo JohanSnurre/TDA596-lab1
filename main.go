@@ -9,6 +9,26 @@ import (
 	"strings"
 )
 
+type response struct {
+	status  string
+	headers map[string]string
+	body    string
+}
+
+func (r response) String() string {
+
+	res := r.status + "\n"
+	for k, v := range r.headers {
+
+		res = res + k + ": " + v + "\n"
+
+	}
+	res = res + "\n" + r.body
+
+	return res
+
+}
+
 func main() {
 
 	port := os.Args[1]
@@ -70,6 +90,7 @@ func handleClient(connection net.Conn) {
 
 	switch request.Method {
 	case "GET":
+
 		getResponse(connection, *request)
 
 	case "POST":
@@ -96,7 +117,9 @@ func getResponse(connection net.Conn, request http.Request) {
 
 	fileExt := strings.Split(reqFile, ".")
 
+
 	var res string
+
 
 	switch fileExt[len(fileExt)-1] {
 	case "html":
@@ -109,8 +132,20 @@ func getResponse(connection net.Conn, request http.Request) {
 		res = makeGetResponse(path+"/gif"+reqFile, "image/gif")
 	case "css":
 		res = makeGetResponse(path+"/gif"+reqFile, "image/gif")
+
 	default:
-		//error
+		status := "HTTP/1.1 400 Bad Request"
+		body := "Bad request"
+		headers := make(map[string]string)
+		//headers["Content-Length: "] = strconv.Itoa(len(body))
+		headers["Content-Type"] = "text:html"
+
+		temp := response{status, headers, body}
+    re := temp.String()
+
+		
+
+	}
 
 	}
 
@@ -125,8 +160,16 @@ func makeGetResponse(path string, header string) string {
 		fmt.Println("error reading")
 		return ""
 	}
+  
+  status := "HTTP/1.1 200 OK"
+	body := string(dat)
+	headers := make(map[string]string)
+	//headers["Content-Length: "] = strconv.Itoa(len(body))
+	headers["Content-Type"] = header
 
-	return "HTTP/1.1 200 OK\n" + "Content-Length: " + fmt.Sprint(len(dat)) + "\nContent-Type: " + header + "\n\n" + string(dat)
+	res := response{status, headers, body}
+
+  return res.String()
 }
 
 func postResponse(connection net.Conn, request http.Request) {
