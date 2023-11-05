@@ -46,7 +46,7 @@ func main() {
 func handleClient(connection net.Conn) {
 
 	fmt.Println("New connection from: ", connection.RemoteAddr())
-	defer connection.Close()
+	//defer connection.Close()
 
 	buffer := make([]byte, 4096)
 
@@ -58,68 +58,77 @@ func handleClient(connection net.Conn) {
 		}
 		return
 	}
+
+	fmt.Println(string(buffer))
+
 	incoming := strings.Fields(string(buffer))
 	request, err := http.NewRequest(incoming[0], incoming[1], nil)
 
-	fmt.Println(request)
+	if err != nil {
+		fmt.Println("req error: ", err.Error())
+	}
+
 	switch request.Method {
 	case "GET":
-		path := "./files"
-		reqFile := request.URL.String()
-
-		fileExt := strings.Split(reqFile, ".")
-
-		switch fileExt[len(fileExt)-1] {
-		case "html":
-			dat, err := os.ReadFile(path + "/html" + reqFile)
-			if err != nil {
-				fmt.Println("error reading")
-				return
-			}
-
-			res := "HTTP/1.1 200 OK\n" + "Content-Length: " + string(len(dat)) + "\nContent-Type: text:html\n\n" + string(dat)
-
-			connection.Write([]byte(res))
-
-		case "png":
-			dat, err := os.ReadFile(path + "/png" + reqFile)
-			if err != nil {
-				fmt.Println("error reading")
-				return
-			}
-
-			res := "HTTP/1.1 200 OK\n" + "Content-Length: " + string(len(dat)) + "\nContent-Type: text:html\n\n" + string(dat)
-
-			connection.Write([]byte(res))
-		}
+		getResponse(connection, *request)
 
 	case "POST":
-		connection.Write([]byte("response dog"))
+		// Get the uploaded file
+		//request.Header.Set("Content-Type", "multipart/form-data")
+
+		_, _, err := request.FormFile("image")
+		if err != nil {
+			fmt.Println("Error retrieving the file:", err)
+			return
+		}
+
+	default:
+		// not implemented error
 
 	}
 
 	return
+}
 
-	/*var buf [4096]byte
+func getResponse(connection net.Conn, request http.Request) {
+	path := "./files"
+	reqFile := request.URL.String()
 
-	defer connection.Close()
-	connection.Write(([]byte("hello")))
+	fileExt := strings.Split(reqFile, ".")
 
-	for {
-		n, err := connection.Read(buf[0:])
-		if err != nil {
-			fmt.Println("<4>", err)
-			return
-		}
-		fmt.Println(string(buf[0:]))
-		_, err2 := connection.Write(buf[0:n])
-		if err2 != nil {
-			fmt.Println("<5>", err)
-			return
+	var res string
 
-		}
+	switch fileExt[len(fileExt)-1] {
+	case "html":
+		res = makeGetResponse(path+"/html"+reqFile, "text/html")
+	case "png":
+		res = makeGetResponse(path+"/png"+reqFile, "image/jpeg")
+	case "txt":
+		res = makeGetResponse(path+"/txt"+reqFile, "text/plain")
+	case "gif":
+		res = makeGetResponse(path+"/gif"+reqFile, "image/gif")
+	case "css":
+		res = makeGetResponse(path+"/gif"+reqFile, "image/gif")
+	default:
+		//error
 
 	}
-	*/
+
+	connection.Write([]byte(res))
+
+}
+
+func makeGetResponse(path string, header string) string {
+	dat, err := os.ReadFile(path)
+	if err != nil {
+		// return 400
+		fmt.Println("error reading")
+		return ""
+	}
+
+	return "HTTP/1.1 200 OK\n" + "Content-Length: " + fmt.Sprint(len(dat)) + "\nContent-Type: " + header + "\n\n" + string(dat)
+}
+
+func postResponse(connection net.Conn, request http.Request) {
 
 }
