@@ -66,7 +66,7 @@ func main() {
 func handleClient(connection net.Conn) {
 
 	fmt.Println("New connection from: ", connection.RemoteAddr())
-	//defer connection.Close()
+	defer connection.Close()
 
 	buffer := make([]byte, 4096)
 
@@ -117,15 +117,17 @@ func getResponse(connection net.Conn, request http.Request) {
 
 	fileExt := strings.Split(reqFile, ".")
 
-
 	var res string
-
 
 	switch fileExt[len(fileExt)-1] {
 	case "html":
 		res = makeGetResponse(path+"/html"+reqFile, "text/html")
 	case "png":
-		res = makeGetResponse(path+"/png"+reqFile, "image/jpeg")
+		res = makeGetResponse(path+"/png"+reqFile, "image/png")
+	case "jpg":
+		res = makeGetResponse(path+"/jpg"+reqFile, "image/jpg")
+	case "jpeg":
+		res = makeGetResponse(path+"/jpeg"+reqFile, "image/jpeg")
 	case "txt":
 		res = makeGetResponse(path+"/txt"+reqFile, "text/plain")
 	case "gif":
@@ -141,11 +143,7 @@ func getResponse(connection net.Conn, request http.Request) {
 		headers["Content-Type"] = "text:html"
 
 		temp := response{status, headers, body}
-    re := temp.String()
-
-		
-
-	}
+		res = temp.String()
 
 	}
 
@@ -154,14 +152,22 @@ func getResponse(connection net.Conn, request http.Request) {
 }
 
 func makeGetResponse(path string, header string) string {
+	if _, err := os.Stat(path); err != nil {
+		status := "HTTP/1.1 404 Not Found"
+		body := "404 This file does not exist"
+		headers := make(map[string]string)
+		headers["Content-Type"] = "text:html"
+		res := response{status, headers, body}
+		return res.String()
+	}
 	dat, err := os.ReadFile(path)
 	if err != nil {
 		// return 400
 		fmt.Println("error reading")
 		return ""
 	}
-  
-  status := "HTTP/1.1 200 OK"
+
+	status := "HTTP/1.1 200 OK"
 	body := string(dat)
 	headers := make(map[string]string)
 	//headers["Content-Length: "] = strconv.Itoa(len(body))
@@ -169,7 +175,7 @@ func makeGetResponse(path string, header string) string {
 
 	res := response{status, headers, body}
 
-  return res.String()
+	return res.String()
 }
 
 func postResponse(connection net.Conn, request http.Request) {
