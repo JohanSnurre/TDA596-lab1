@@ -66,7 +66,7 @@ func main() {
 func handleClient(connection net.Conn) {
 
 	fmt.Println("New connection from: ", connection.RemoteAddr())
-	defer connection.Close()
+	//defer connection.Close()
 
 	buffer := make([]byte, 4096)
 
@@ -78,134 +78,60 @@ func handleClient(connection net.Conn) {
 		}
 		return
 	}
+
+	fmt.Println(string(buffer))
+
 	incoming := strings.Fields(string(buffer))
 	request, err := http.NewRequest(incoming[0], incoming[1], nil)
 
-	fmt.Println(request)
+	if err != nil {
+		fmt.Println("req error: ", err.Error())
+	}
+
 	switch request.Method {
 	case "GET":
-		path := "./files"
-		URL := request.URL.String()
-		fileName := URL[:strings.LastIndex(URL, ".")]
 
-		//temp := strings.Split(URL, ".")
-
-		fileExt := URL[strings.LastIndex(URL, ".")+1:]
-		println("FILENAME: ", fileName)
-		println("FILEEXT: ", fileExt)
-
-		switch fileExt {
-		case "html":
-			dat, err := os.ReadFile(path + "/html" + fileName + "." + fileExt)
-			println("length: ", dat)
-			if err != nil {
-				fmt.Println("error reading")
-				status := "HTTP/1.1 500 Internal Server Error"
-				body := "Something on the server went wrong"
-				headers := make(map[string]string)
-				//headers["Content-Length: "] = strconv.Itoa(len(body))
-				headers["Content-Type"] = "text:html"
-
-				res := response{status, headers, body}
-				connection.Write([]byte(res.String()))
-
-				return
-			}
-
-			status := "HTTP/1.1 200 OK"
-			body := string(dat)
-			headers := make(map[string]string)
-			//headers["Content-Length: "] = strconv.Itoa(len(dat))
-			headers["Content-Type"] = "text:html"
-
-			res := response{status, headers, body}
-
-			connection.Write([]byte(res.String()))
-			println(res.String())
-
-		case "png":
-			dat, err := os.ReadFile(path + "/png" + fileName + "." + fileExt)
-			if err != nil {
-				fmt.Println("error reading")
-				status := "HTTP/1.1 500 Internal Server Error"
-				body := "Something on the server went wrong"
-				headers := make(map[string]string)
-				//headers["Content-Length: "] = strconv.Itoa(len(body))
-				headers["Content-Type"] = "text:html"
-
-				res := response{status, headers, body}
-				connection.Write([]byte(res.String()))
-
-				return
-			}
-
-			status := "HTTP/1.1 200 OK"
-			body := string(dat)
-			headers := make(map[string]string)
-			//headers["Content-Length: "] = strconv.Itoa(len(body))
-			headers["Content-Type"] = "image:png"
-
-			res := response{status, headers, body}
-
-			connection.Write([]byte(res.String()))
-
-		case "jpg", "jpeg":
-			fileExt = "jpg"
-			dat, err := os.ReadFile(path + "/jpg" + fileName + "." + fileExt)
-			if err != nil {
-				fmt.Println("error reading")
-				status := "HTTP/1.1 500 Internal Server Error"
-				body := "Something on the server went wrong"
-				headers := make(map[string]string)
-				//headers["Content-Length: "] = strconv.Itoa(len(body))
-				headers["Content-Type"] = "text:html"
-
-				res := response{status, headers, body}
-				connection.Write([]byte(res.String()))
-
-				return
-			}
-
-			status := "HTTP/1.1 200 OK"
-			body := string(dat)
-			headers := make(map[string]string)
-			//headers["Content-Length: "] = strconv.Itoa(len(body))
-			headers["Content-Type"] = "image:jpg"
-
-			res := response{status, headers, body}
-
-			connection.Write([]byte(res.String()))
-
-		case "ico":
-			dat, err := os.ReadFile(path + "/ico" + fileName + "." + fileExt)
-			if err != nil {
-				fmt.Println("error reading")
-				status := "HTTP/1.1 500 Internal Server Error"
-				body := "Something on the server went wrong"
-				headers := make(map[string]string)
-				//headers["Content-Length: "] = strconv.Itoa(len(body))
-				headers["Content-Type"] = "text:html"
-
-				res := response{status, headers, body}
-				connection.Write([]byte(res.String()))
-
-				return
-			}
-
-			status := "HTTP/1.1 200 OK"
-			body := string(dat)
-			headers := make(map[string]string)
-			//headers["Content-Length: "] = strconv.Itoa(len(body))
-			headers["Content-Type"] = "image:ico"
-
-			res := response{status, headers, body}
-
-			connection.Write([]byte(res.String()))
-
-		}
+		getResponse(connection, *request)
 
 	case "POST":
-		connection.Write([]byte("response dog"))
+		// Get the uploaded file
+		//request.Header.Set("Content-Type", "multipart/form-data")
+
+		_, _, err := request.FormFile("image")
+		if err != nil {
+			fmt.Println("Error retrieving the file:", err)
+			return
+		}
+
+	default:
+		// not implemented error
+
+	}
+
+	return
+}
+
+func getResponse(connection net.Conn, request http.Request) {
+	path := "./files"
+	reqFile := request.URL.String()
+
+	fileExt := strings.Split(reqFile, ".")
+
+
+	var res string
+
+
+	switch fileExt[len(fileExt)-1] {
+	case "html":
+		res = makeGetResponse(path+"/html"+reqFile, "text/html")
+	case "png":
+		res = makeGetResponse(path+"/png"+reqFile, "image/jpeg")
+	case "txt":
+		res = makeGetResponse(path+"/txt"+reqFile, "text/plain")
+	case "gif":
+		res = makeGetResponse(path+"/gif"+reqFile, "image/gif")
+	case "css":
+		res = makeGetResponse(path+"/gif"+reqFile, "image/gif")
 
 	default:
 		status := "HTTP/1.1 400 Bad Request"
@@ -214,34 +140,38 @@ func handleClient(connection net.Conn) {
 		//headers["Content-Length: "] = strconv.Itoa(len(body))
 		headers["Content-Type"] = "text:html"
 
-		res := response{status, headers, body}
+		temp := response{status, headers, body}
+    re := temp.String()
 
-		connection.Write([]byte(res.String()))
+		
+
+	}
 
 	}
 
-	return
+	connection.Write([]byte(res))
 
-	/*var buf [4096]byte
+}
 
-	defer connection.Close()
-	connection.Write(([]byte("hello")))
-
-	for {
-		n, err := connection.Read(buf[0:])
-		if err != nil {
-			fmt.Println("<4>", err)
-			return
-		}
-		fmt.Println(string(buf[0:]))
-		_, err2 := connection.Write(buf[0:n])
-		if err2 != nil {
-			fmt.Println("<5>", err)
-			return
-
-		}
-
+func makeGetResponse(path string, header string) string {
+	dat, err := os.ReadFile(path)
+	if err != nil {
+		// return 400
+		fmt.Println("error reading")
+		return ""
 	}
-	*/
+  
+  status := "HTTP/1.1 200 OK"
+	body := string(dat)
+	headers := make(map[string]string)
+	//headers["Content-Length: "] = strconv.Itoa(len(body))
+	headers["Content-Type"] = header
+
+	res := response{status, headers, body}
+
+  return res.String()
+}
+
+func postResponse(connection net.Conn, request http.Request) {
 
 }
