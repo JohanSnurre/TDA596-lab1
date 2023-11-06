@@ -234,3 +234,5 @@ func postResponse(connection net.Conn, request http.Request) {
 	headers["Content-Type"] = "text/html"
 	res := response{status, headers, body}
 	connection.Write([]byte(res.String()))
+
+}
