@@ -96,6 +96,7 @@ func handleClient(connection net.Conn) {
 	case "POST":
 		// Get the uploaded file
 		//request.Header.Set("Content-Type", "multipart/form-data")
+		postResponse(connection, *request)
 
 		_, _, err := request.FormFile("image")
 		if err != nil {
@@ -134,6 +135,8 @@ func getResponse(connection net.Conn, request http.Request) {
 		res = makeGetResponse(path+"/gif"+reqFile, "image/gif")
 	case "css":
 		res = makeGetResponse(path+"/gif"+reqFile, "image/gif")
+	case "ico":
+		res = makeGetResponse(path+"/ico"+reqFile, "image/ico")
 
 	default:
 		status := "HTTP/1.1 400 Bad Request"
@@ -181,3 +184,53 @@ func makeGetResponse(path string, header string) string {
 func postResponse(connection net.Conn, request http.Request) {
 
 }
+
+func postResponse(connection net.Conn, request http.Request) {
+
+	allowedContentTypes := map[string]bool{
+		"text/html":  true,
+		"text/plain": true,
+		"image/gif":  true,
+		"image/jpeg": true,
+		"image/png":  true,
+		"text/css":   true,
+	}
+
+	contentType := request.Header.Get("Content-Type")
+
+	// Check if the request is in multipart/form-data format
+	if !allowedContentTypes[contentType] {
+		status := "HTTP/1.1 400 Bad Request"
+		body := "Bad request - POST data must be in multipart/form-data format"
+		headers := make(map[string]string)
+		headers["Content-Length"] = strconv.Itoa(len(body))
+		headers["Content-Type"] = "text/html"
+		res := response{status, headers, body}
+		connection.Write([]byte(res.String()))
+		return
+	}
+	// Retrieve the file from the request
+	file, _, err := request.FormFile("image")
+	// Check if the file is present
+	if err != nil {
+		status := "HTTP/1.1 400 Bad Request"
+		body := "Bad request - Unable to retrieve the file from the POST request"
+		headers := make(map[string]string)
+		headers["Content-Length"] = strconv.Itoa(len(body))
+		headers["Content-Type"] = "text/html"
+		res := response{status, headers, body}
+		connection.Write([]byte(res.String()))
+		return
+	}
+	defer file.Close()
+
+	// Todo
+	// Store the file on the server
+
+	status := "HTTP/1.1 200 OK"
+	body := "File uploaded successfully"
+	headers := make(map[string]string)
+	headers["Content-Length"] = strconv.Itoa(len(body))
+	headers["Content-Type"] = "text/html"
+	res := response{status, headers, body}
+	connection.Write([]byte(res.String()))
