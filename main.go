@@ -183,10 +183,6 @@ func makeGetResponse(path string, header string) string {
 
 func postResponse(connection net.Conn, request http.Request) {
 
-}
-
-func postResponse(connection net.Conn, request http.Request) {
-
 	allowedContentTypes := map[string]bool{
 		"text/html":  true,
 		"text/plain": true,
@@ -203,7 +199,7 @@ func postResponse(connection net.Conn, request http.Request) {
 		status := "HTTP/1.1 400 Bad Request"
 		body := "Bad request - POST data must be in multipart/form-data format"
 		headers := make(map[string]string)
-		headers["Content-Length"] = strconv.Itoa(len(body))
+		//headers["Content-Length"] = strconv.Itoa(len(body))
 		headers["Content-Type"] = "text/html"
 		res := response{status, headers, body}
 		connection.Write([]byte(res.String()))
@@ -216,7 +212,7 @@ func postResponse(connection net.Conn, request http.Request) {
 		status := "HTTP/1.1 400 Bad Request"
 		body := "Bad request - Unable to retrieve the file from the POST request"
 		headers := make(map[string]string)
-		headers["Content-Length"] = strconv.Itoa(len(body))
+		//headers["Content-Length"] = strconv.Itoa(len(body))
 		headers["Content-Type"] = "text/html"
 		res := response{status, headers, body}
 		connection.Write([]byte(res.String()))
@@ -230,7 +226,7 @@ func postResponse(connection net.Conn, request http.Request) {
 	status := "HTTP/1.1 200 OK"
 	body := "File uploaded successfully"
 	headers := make(map[string]string)
-	headers["Content-Length"] = strconv.Itoa(len(body))
+	//headers["Content-Length"] = strconv.Itoa(len(body))
 	headers["Content-Type"] = "text/html"
 	res := response{status, headers, body}
 	connection.Write([]byte(res.String()))
