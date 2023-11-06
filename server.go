@@ -130,8 +130,20 @@ func makeGetResponse(path string, header string) string {
 }
 
 func postResponse(connection net.Conn, request http.Request) {
+
+	allowedContentTypes := map[string]bool{
+		"text/html":  true,
+		"text/plain": true,
+		"image/gif":  true,
+		"image/jpeg": true,
+		"image/png":  true,
+		"text/css":   true,
+	}
+
+	contentType := request.Header.Get("Content-Type")
+
 	// Check if the request is in multipart/form-data format
-	if request.Header.Get("Content-Type") != "multipart/form-data" {
+	if !allowedContentTypes[contentType] {
 		status := "HTTP/1.1 400 Bad Request"
 		body := "Bad request - POST data must be in multipart/form-data format"
 		headers := make(map[string]string)
