@@ -41,9 +41,7 @@ func (r response) String() string {
 }
 
 func main() {
-	//port := os.Args[1]
-
-	port := "127.0.0.1:8080"
+	port := os.Args[1]
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", port)
 
