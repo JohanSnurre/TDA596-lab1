@@ -23,6 +23,7 @@ var supportedContentTypes = map[string]string{
 	"jpeg": "image/jpeg",
 	"jpg":  "image/jpg",
 	"css":  "text/css",
+	"ico":  "image/ico",
 }
 
 func (r response) String() string {
@@ -40,8 +41,8 @@ func (r response) String() string {
 }
 
 func main() {
-
 	//port := os.Args[1]
+
 	port := "127.0.0.1:8080"
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", port)
@@ -103,32 +104,16 @@ func handleClient(connection net.Conn) {
 }
 
 func getResponse(connection net.Conn, request http.Request) {
-	path := "./files"
+	var res string
+	path := "./files/"
+
 	reqFile := request.URL.String()
 
-	fileExt := strings.Split(reqFile, ".")
+	fileExt := getFileExt(reqFile)
 
-	var res string
-
-	switch fileExt[len(fileExt)-1] {
-	case "html":
-		res = makeGetResponse(path+"/html"+reqFile, "text/html")
-	case "png":
-		res = makeGetResponse(path+"/png"+reqFile, "image/png")
-	case "jpg":
-		res = makeGetResponse(path+"/jpg"+reqFile, "image/jpg")
-	case "jpeg":
-		res = makeGetResponse(path+"/jpeg"+reqFile, "image/jpeg")
-	case "txt":
-		res = makeGetResponse(path+"/txt"+reqFile, "text/plain")
-	case "gif":
-		res = makeGetResponse(path+"/gif"+reqFile, "image/gif")
-	case "css":
-		res = makeGetResponse(path+"/gif"+reqFile, "image/gif")
-	case "ico":
-		res = makeGetResponse(path+"/ico"+reqFile, "image/ico")
-
-	default:
+	header, err := getHeaderType(fileExt)
+	if err != nil {
+		fmt.Println(err)
 		status := "HTTP/1.1 400 Bad Request"
 		body := "Bad request"
 		headers := make(map[string]string)
@@ -137,11 +122,15 @@ func getResponse(connection net.Conn, request http.Request) {
 
 		temp := response{status, headers, body}
 		res = temp.String()
-
+		connection.Write([]byte(res))
+		return
 	}
 
-	connection.Write([]byte(res))
+	filePath := path + fileExt + reqFile
 
+	res = makeGetResponse(filePath, header)
+
+	connection.Write([]byte(res))
 }
 
 func makeGetResponse(path string, header string) string {
@@ -172,10 +161,6 @@ func makeGetResponse(path string, header string) string {
 }
 
 func postResponse(connection net.Conn, request http.Request) {
-	path := request.URL.Path
-	fileName := path[1:]
-
-	fmt.Println(fileName)
 	request.ParseMultipartForm(10 << 20)
 
 	file, handler, err := request.FormFile("file")
@@ -194,18 +179,22 @@ func postResponse(connection net.Conn, request http.Request) {
 	}
 	defer file.Close()
 
-	filepath := "./files/jpg/" + handler.Filename
-	dst, err := os.Create(filepath)
+	fileName := handler.Filename
+	fileExt := getFileExt(fileName)
+
+	filePath := "./files/" + fileExt + "/" + handler.Filename
+
+	dst, err := os.Create(filePath)
 	if err != nil {
 		fmt.Println("error creating file", err)
 		return
 	}
+
 	defer dst.Close()
 	if _, err := io.Copy(dst, file); err != nil {
 		fmt.Println("error something file", err)
 		return
 	}
-	fmt.Println("uploaded file")
 
 	status := "HTTP/1.1 200 OK"
 	body := "File uploaded successfully"
@@ -217,10 +206,17 @@ func postResponse(connection net.Conn, request http.Request) {
 
 }
 
-func getFilePath(fileExt string) string {
-	return ""
+func getFileExt(reqFile string) string {
+	split := strings.Split(reqFile, ".")
+	return split[len(split)-1]
 }
 
-func getHeaderType(fileExt string) string {
-	return ""
+func getHeaderType(fileExt string) (string, error) {
+	header, err := supportedContentTypes[fileExt]
+
+	if !err {
+		return "", fmt.Errorf("unsupported header")
+	} else {
+		return header, nil
+	}
 }
