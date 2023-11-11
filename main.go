@@ -11,9 +11,9 @@ import (
 )
 
 type response struct {
-	status  string
-	headers map[string]string
-	body    string
+	status string
+	header string
+	body   string
 }
 
 var supportedContentTypes = map[string]string{
@@ -26,18 +26,31 @@ var supportedContentTypes = map[string]string{
 	"ico":  "image/ico",
 }
 
-func (r response) String() string {
+var jsonType string = "application/json"
 
-	res := r.status + "\n"
-	for k, v := range r.headers {
+var statusCode = map[int]string{
+	200: "200 OK",
+	201: "201 Created",
+	400: "400 Bad Request",
+	404: "404 Not Found",
+}
 
-		res = res + k + ": " + v + "\n"
-
+func jsonRes(text string, isError bool) string {
+	var field string
+	if isError {
+		field = "error: "
+	} else {
+		field = "response: "
 	}
-	res = res + "\n" + r.body
 
-	return res
+	return "{" + field + text + "}"
+}
 
+func (res response) String() string {
+	statusHeader := "HTTP/1.1 " + res.status + "\r\n"
+	contentHeader := "Content-Type:" + res.header + "\r\n\r\n"
+
+	return statusHeader + contentHeader + res.body
 }
 
 func main() {
@@ -94,8 +107,8 @@ func handleClient(connection net.Conn) {
 		postResponse(connection, *request)
 
 	default:
-		// not implemented error
-
+		response := response{statusCode[400], jsonType, jsonRes("Method not implemented", true)}
+		connection.Write([]byte(response.String()))
 	}
 
 	return
@@ -111,16 +124,8 @@ func getResponse(connection net.Conn, request http.Request) {
 
 	header, err := getHeaderType(fileExt)
 	if err != nil {
-		fmt.Println(err)
-		status := "HTTP/1.1 400 Bad Request"
-		body := "Bad request"
-		headers := make(map[string]string)
-		//headers["Content-Length: "] = strconv.Itoa(len(body))
-		headers["Content-Type"] = "text:html"
-
-		temp := response{status, headers, body}
-		res = temp.String()
-		connection.Write([]byte(res))
+		res := response{statusCode[400], jsonType, jsonRes("Invalid file type", true)}
+		connection.Write([]byte(res.String()))
 		return
 	}
 
@@ -133,28 +138,17 @@ func getResponse(connection net.Conn, request http.Request) {
 
 func makeGetResponse(path string, header string) string {
 	if _, err := os.Stat(path); err != nil {
-		status := "HTTP/1.1 404 Not Found"
-		body := "404 This file does not exist"
-		headers := make(map[string]string)
-		headers["Content-Type"] = "text:html"
-		res := response{status, headers, body}
+		res := response{statusCode[404], jsonType, jsonRes("The file does not exists", true)}
 		return res.String()
 	}
 	dat, err := os.ReadFile(path)
 	if err != nil {
 		// return 400
-		fmt.Println("error reading")
-		return ""
+		res := response{statusCode[400], jsonType, jsonRes("The file cannot be read", true)}
+		return res.String()
 	}
 
-	status := "HTTP/1.1 200 OK"
-	body := string(dat)
-	headers := make(map[string]string)
-	//headers["Content-Length: "] = strconv.Itoa(len(body))
-	headers["Content-Type"] = header
-
-	res := response{status, headers, body}
-
+	res := response{statusCode[200], header, string(dat)}
 	return res.String()
 }
 
@@ -165,13 +159,7 @@ func postResponse(connection net.Conn, request http.Request) {
 
 	// Check if the file is present
 	if err != nil {
-		fmt.Println("<14>file receive error", err)
-		status := "HTTP/1.1 400 Bad Request"
-		body := "Bad request - Unable to retrieve the file from the POST request"
-		headers := make(map[string]string)
-		//headers["Content-Length"] = strconv.Itoa(len(body))
-		headers["Content-Type"] = "text/html"
-		res := response{status, headers, body}
+		res := response{statusCode[400], jsonType, jsonRes("Unable to retrieve the file from the POST request: "+err.Error(), true)}
 		connection.Write([]byte(res.String()))
 		return
 	}
@@ -184,22 +172,19 @@ func postResponse(connection net.Conn, request http.Request) {
 
 	dst, err := os.Create(filePath)
 	if err != nil {
-		fmt.Println("error creating file", err)
+		res := response{statusCode[400], jsonType, jsonRes("Error creating file: "+err.Error(), true)}
+		connection.Write([]byte(res.String()))
 		return
 	}
 
 	defer dst.Close()
 	if _, err := io.Copy(dst, file); err != nil {
-		fmt.Println("error something file", err)
+		res := response{statusCode[400], jsonType, jsonRes("Error fetching file: "+err.Error(), true)}
+		connection.Write([]byte(res.String()))
 		return
 	}
 
-	status := "HTTP/1.1 200 OK"
-	body := "File uploaded successfully"
-	headers := make(map[string]string)
-	//headers["Content-Length"] = strconv.Itoa(len(body))
-	headers["Content-Type"] = "text/html"
-	res := response{status, headers, body}
+	res := response{statusCode[201], jsonType, jsonRes("Item created successfully", false)}
 	connection.Write([]byte(res.String()))
 
 }
