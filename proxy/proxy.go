@@ -32,6 +32,7 @@ var statusCode = map[int]string{
 	201: "201 Created",
 	400: "400 Bad Request",
 	404: "404 Not Found",
+	501: "501 Not Implemented",
 }
 
 func jsonRes(text string, isError bool) string {
@@ -99,26 +100,23 @@ func handleClient(connection net.Conn, serverAddr string) {
 		return
 	}
 
-	/*server, err := net.Dial("tcp", serverAddr)
-	if err != nil {
-		fmt.Print("proxy error cnnection to server: ", err.Error())
-	}
-	server.Close()
-	*/
-
 	switch request.Method {
 	case "GET":
 		var reqBuf, resBuf bytes.Buffer
 
 		server, err := net.Dial("tcp", serverAddr)
 		if err != nil {
-			fmt.Println(err.Error())
+			res := response{statusCode[400], jsonType, jsonRes("Error connecting to the server -"+err.Error(), true)}
+			connection.Write([]byte(res.String()))
 			return
 		}
 
+		defer server.Close()
+
 		err = request.Write(&reqBuf)
 		if err != nil {
-			fmt.Print(err.Error())
+			res := response{statusCode[400], jsonType, jsonRes("Error writing to server -"+err.Error(), true)}
+			connection.Write([]byte(res.String()))
 			return
 		}
 
@@ -128,20 +126,22 @@ func handleClient(connection net.Conn, serverAddr string) {
 		reader := bufio.NewReader(server)
 		res, err := http.ReadResponse(reader, request)
 		if err != nil {
-			fmt.Println("Error reading response:", err.Error())
+			res := response{statusCode[400], jsonType, jsonRes("Error reading response -"+err.Error(), true)}
+			connection.Write([]byte(res.String()))
 			return
 		}
 
 		err = res.Write(&resBuf)
 		if err != nil {
-			fmt.Println("Error write:", err.Error())
+			res := response{statusCode[400], jsonType, jsonRes("Error writing response -"+err.Error(), true)}
+			connection.Write([]byte(res.String()))
 			return
 
 		}
 
 		connection.Write(resBuf.Bytes())
 	default:
-		response := response{statusCode[400], jsonType, jsonRes("Method not implemented", true)}
+		response := response{statusCode[501], jsonType, jsonRes("Method not implemented", true)}
 		connection.Write([]byte(response.String()))
 	}
 }

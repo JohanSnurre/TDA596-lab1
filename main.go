@@ -208,7 +208,7 @@ func postResponse(connection net.Conn, request http.Request) {
 
 	// Check if the file is present
 	if err != nil {
-		res := response{statusCode[400], jsonType, jsonRes("Unable to retrieve the file from the POST request: "+err.Error(), true)}
+		res := response{statusCode[400], jsonType, jsonRes("Unable to retrieve the file from the POST request - "+err.Error(), true)}
 		connection.Write([]byte(res.String()))
 		return
 	}
@@ -221,14 +221,16 @@ func postResponse(connection net.Conn, request http.Request) {
 
 	dst, err := os.Create(filePath)
 	if err != nil {
-		res := response{statusCode[400], jsonType, jsonRes("Error creating file: "+err.Error(), true)}
+		res := response{statusCode[400], jsonType, jsonRes("Error creating file - "+err.Error(), true)}
 		connection.Write([]byte(res.String()))
 		return
 	}
 
 	defer dst.Close()
+
+	// copy content
 	if _, err := io.Copy(dst, file); err != nil {
-		res := response{statusCode[400], jsonType, jsonRes("Error fetching file: "+err.Error(), true)}
+		res := response{statusCode[400], jsonType, jsonRes("Error copying content - "+err.Error(), true)}
 		connection.Write([]byte(res.String()))
 		return
 	}
