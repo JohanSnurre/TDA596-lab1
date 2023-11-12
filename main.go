@@ -133,7 +133,7 @@ func handleClient(connection net.Conn, i int, k chan string) {
 
 	//fmt.Println("New connection from: ", connection.RemoteAddr())
 	defer connection.Close()
-	//k <- strconv.Itoa(i) + ", New connection from: " + connection.RemoteAddr().String() + ", Current threads: " + strconv.Itoa(currentWorkers)
+	k <- strconv.Itoa(i) + ", New connection from: " + connection.RemoteAddr().String() + ", Current threads: " + strconv.Itoa(currentWorkers)
 	reader := bufio.NewReader(connection)
 	request, err := http.ReadRequest(reader)
 
