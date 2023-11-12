@@ -8,12 +8,23 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 )
 
 type response struct {
 	status  string
 	headers map[string]string
 	body    string
+}
+
+var supportedContentTypes = map[string]string{
+	"html": "text/html",
+	"txt":  "text/plain",
+	"gif":  "image/gif",
+	"jpeg": "image/jpeg",
+	"jpg":  "image/jpg",
+	"css":  "text/css",
+	"ico":  "image/ico",
 }
 
 func (r response) String() string {
@@ -31,7 +42,6 @@ func (r response) String() string {
 }
 
 func main() {
-
 	port := os.Args[1]
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", port)
@@ -47,6 +57,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	//define a channel to control the number of goroutines
+
+	maxGoroutines := 10
+	goRoutineSem := make(chan struct{}, maxGoroutines)
+
+	var wg sync.WaitGroup
+
 	fmt.Printf("Server started at address (%s) and port (%s)\n", listener.Addr().String(), port)
 	for {
 
@@ -56,9 +73,23 @@ func main() {
 			os.Exit(1)
 		}
 
-		go handleClient(connection)
+		//add a goroutine to the waitgroup
+		wg.Add(1)
+
+		//start a goroutine
+		go func(connection net.Conn) {
+			defer wg.Done()
+
+			goRoutineSem <- struct{}{}
+			handleClient(connection)
+			<-goRoutineSem
+		}(connection)
 
 	}
+
+	//wait for all goroutines to finish
+	wg.Wait()
+	close(goRoutineSem)
 
 	os.Exit(0)
 
@@ -69,33 +100,19 @@ func handleClient(connection net.Conn) {
 	fmt.Println("New connection from: ", connection.RemoteAddr())
 	defer connection.Close()
 
-	buffer := make([]byte, 4096)
-
-	_, err := connection.Read(buffer)
-	if err != nil {
-		fmt.Println("<10>", err)
-		if err == io.EOF {
-			fmt.Println("Terminating connection from ", connection.RemoteAddr())
-		}
-		return
-	}
-
-	fmt.Println(string(buffer))
-
-	reader := bufio.NewReader(strings.NewReader(string(buffer)))
+	reader := bufio.NewReader(connection)
 	request, err := http.ReadRequest(reader)
 
 	if err != nil {
-		fmt.Println("req error: ", err.Error())
+		fmt.Println("<4> Error reading request: ", err.Error())
+		return
 	}
 
 	switch request.Method {
 	case "GET":
-
 		getResponse(connection, *request)
 
 	case "POST":
-
 		postResponse(connection, *request)
 
 	default:
@@ -107,32 +124,33 @@ func handleClient(connection net.Conn) {
 }
 
 func getResponse(connection net.Conn, request http.Request) {
-	path := "./files"
+	var res string
+	path := "./files/"
+
 	reqFile := request.URL.String()
 
-	fileExt := strings.Split(reqFile, ".")
+	fileExt := getFileExt(reqFile)
 
-	contentType := request.Header.Get("Content-Type")
-
-	var res string
-
-	switch fileExt[len(fileExt)-1] {
-	case "html", "txt", "gif", "jpeg", "jpg", "css":
-		res = makeGetResponse(path+reqFile, contentType)
-
-	default:
+	header, err := getHeaderType(fileExt)
+	if err != nil {
+		fmt.Println(err)
 		status := "HTTP/1.1 400 Bad Request"
 		body := "Bad request"
 		headers := make(map[string]string)
 		//headers["Content-Length: "] = strconv.Itoa(len(body))
 		headers["Content-Type"] = "text:html"
+
 		temp := response{status, headers, body}
 		res = temp.String()
-
+		connection.Write([]byte(res))
+		return
 	}
 
-	connection.Write([]byte(res))
+	filePath := path + fileExt + reqFile
 
+	res = makeGetResponse(filePath, header)
+
+	connection.Write([]byte(res))
 }
 
 func makeGetResponse(path string, header string) string {
@@ -163,36 +181,13 @@ func makeGetResponse(path string, header string) string {
 }
 
 func postResponse(connection net.Conn, request http.Request) {
+	request.ParseMultipartForm(10 << 20)
 
-	allowedContentTypes := map[string]bool{
-		"text/html":  true,
-		"text/plain": true,
-		"image/gif":  true,
-		"image/jpeg": true,
-		"image/png":  true,
-		"text/css":   true,
-	}
+	file, handler, err := request.FormFile("file")
 
-	contentType := request.Header.Get("Content-Type")
-
-	if !allowedContentTypes[contentType] {
-		status := "HTTP/1.1 400 Bad Request"
-		body := "Bad request - POST data must be in multipart/form-data format"
-		headers := make(map[string]string)
-		//headers["Content-Length"] = strconv.Itoa(len(body))
-		headers["Content-Type"] = "text/html"
-		res := response{status, headers, body}
-		connection.Write([]byte(res.String()))
-		return
-	}
-	// Retrieve the file from the request
-	file, header, err := request.FormFile("image")
-	if err != nil {
-		fmt.Println("Error retrieving the file:", err)
-		return
-	}
 	// Check if the file is present
 	if err != nil {
+		fmt.Println("<14>file receive error", err)
 		status := "HTTP/1.1 400 Bad Request"
 		body := "Bad request - Unable to retrieve the file from the POST request"
 		headers := make(map[string]string)
@@ -204,30 +199,20 @@ func postResponse(connection net.Conn, request http.Request) {
 	}
 	defer file.Close()
 
-	// Create a new file on the server
-	uploadedFile, err := os.Create("uploads/" + header.Filename)
+	fileName := handler.Filename
+	fileExt := getFileExt(fileName)
+
+	filePath := "./files/" + fileExt + "/" + handler.Filename
+
+	dst, err := os.Create(filePath)
 	if err != nil {
-		status := "HTTP/1.1 500 Internal Server Error"
-		body := "Failed to create file on server"
-		headers := make(map[string]string)
-		//headers["Content-Length"] = strconv.Itoa(len(body))
-		headers["Content-Type"] = "text/html"
-		res := response{status, headers, body}
-		connection.Write([]byte(res.String()))
+		fmt.Println("error creating file", err)
 		return
 	}
-	defer uploadedFile.Close()
 
-	// Copy the file content to the uploaded file on the server
-	_, err = io.Copy(uploadedFile, file)
-	if err != nil {
-		status := "HTTP/1.1 500 Internal Server Error"
-		body := "Failed to copy file content to the server"
-		headers := make(map[string]string)
-		//headers["Content-Length"] = strconv.Itoa(len(body))
-		headers["Content-Type"] = "text/html"
-		res := response{status, headers, body}
-		connection.Write([]byte(res.String()))
+	defer dst.Close()
+	if _, err := io.Copy(dst, file); err != nil {
+		fmt.Println("error something file", err)
 		return
 	}
 
@@ -239,4 +224,19 @@ func postResponse(connection net.Conn, request http.Request) {
 	res := response{status, headers, body}
 	connection.Write([]byte(res.String()))
 
+}
+
+func getFileExt(reqFile string) string {
+	split := strings.Split(reqFile, ".")
+	return split[len(split)-1]
+}
+
+func getHeaderType(fileExt string) (string, error) {
+	header, err := supportedContentTypes[fileExt]
+
+	if !err {
+		return "", fmt.Errorf("unsupported header")
+	} else {
+		return header, nil
+	}
 }
