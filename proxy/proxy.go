@@ -60,11 +60,13 @@ func main() {
 	tcpAddr, err := net.ResolveTCPAddr("tcp", port)
 
 	if err != nil {
+		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	if err != nil {
+		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 
