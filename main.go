@@ -7,7 +7,9 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
+	"sync"
 )
 
 type response struct {
@@ -53,8 +55,16 @@ func (res response) String() string {
 	return statusHeader + contentHeader + res.body
 }
 
+var maxworker = 10
+var currentWorkers = 0
+
+var mu, ma, cond_mu sync.Mutex
+var cond sync.Cond
+
 func main() {
+
 	port := os.Args[1]
+	cond = *sync.NewCond(&cond_mu)
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", port)
 
@@ -70,27 +80,60 @@ func main() {
 	}
 
 	fmt.Printf("Server started at address (%s) and port (%s)\n", listener.Addr().String(), port)
+
+	k := make(chan string)
+	for i := 0; i < 1; i++ {
+		fmt.Println("Created test")
+		go listen(listener, i, k)
+	}
+
 	for {
-
-		connection, err := listener.Accept()
-		if err != nil {
-			fmt.Println("<3>", err)
-			os.Exit(1)
-		}
-
-		go handleClient(connection)
-
+		fmt.Println(<-k)
 	}
 
 	os.Exit(0)
 
 }
 
-func handleClient(connection net.Conn) {
+func cmp() int {
+	mu.Lock()
+	ret := 0
+	if currentWorkers >= maxworker {
+		ret = 1
+	}
+	mu.Unlock()
+	return ret
+}
 
-	fmt.Println("New connection from: ", connection.RemoteAddr())
+func listen(listener *net.TCPListener, i int, k chan string) {
+	for {
+		ma.Lock()
+		for cmp() == 1 {
+
+			cond.L.Lock()
+			k <- strconv.Itoa(i) + " WAITING" + ", Current threads: " + strconv.Itoa(currentWorkers)
+			cond.Wait()
+			cond.L.Unlock()
+		}
+
+		connection, err := listener.Accept()
+		if err != nil {
+			fmt.Println("<3>", err)
+			os.Exit(1)
+		}
+		currentWorkers = currentWorkers + 1
+		ma.Unlock()
+		go handleClient(connection, i, k)
+
+	}
+
+}
+
+func handleClient(connection net.Conn, i int, k chan string) {
+
+	//fmt.Println("New connection from: ", connection.RemoteAddr())
 	defer connection.Close()
-
+	k <- strconv.Itoa(i) + ", New connection from: " + connection.RemoteAddr().String() + ", Current threads: " + strconv.Itoa(currentWorkers)
 	reader := bufio.NewReader(connection)
 	request, err := http.ReadRequest(reader)
 
@@ -111,6 +154,12 @@ func handleClient(connection net.Conn) {
 		connection.Write([]byte(response.String()))
 	}
 
+	mu.Lock()
+	cond.L.Lock()
+	currentWorkers = currentWorkers - 1
+	cond.Signal()
+	cond.L.Unlock()
+	mu.Unlock()
 	return
 }
 

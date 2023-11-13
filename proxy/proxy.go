@@ -99,11 +99,12 @@ func handleClient(connection net.Conn, serverAddr string) {
 		return
 	}
 
-	server, err := net.Dial("tcp", serverAddr)
+	/*server, err := net.Dial("tcp", serverAddr)
 	if err != nil {
 		fmt.Print("proxy error cnnection to server: ", err.Error())
 	}
 	server.Close()
+	*/
 
 	switch request.Method {
 	case "GET":
