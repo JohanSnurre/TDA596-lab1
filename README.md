@@ -1,6 +1,6 @@
 ## Start up
 ##### server:
-The file containing server is run with *main.exe*. User just have to run it and specify the server port as an argument. Then the server is running. To do
+The file containing server is run with *http_server.exe*. User just have to run it and specify the server port as an argument. Then the server is running. To do
 
  - the **get** request - the url format for getting is: 
  *address/<requested_file.extension>*
@@ -19,5 +19,5 @@ We are running one EC2 instance for the server and one for proxy. The server has
 http://ec2-52-54-103-84.compute-1.amazonaws.com:12345/<requested_file.extension> 
 
  - the proxy:
- 
+
 https://ec2-3-93-43-235.compute-1.amazonaws.com:12346/<requested_file.extension>
