@@ -18,5 +18,6 @@ We are running one EC2 instance for the server and one for proxy. The server has
 
 http://ec2-52-54-103-84.compute-1.amazonaws.com:12345/<requested_file.extension> 
 
- - the proxy
+ - the proxy:
+ 
 https://ec2-3-93-43-235.compute-1.amazonaws.com:12346/<requested_file.extension>
