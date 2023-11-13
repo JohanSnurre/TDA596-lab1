@@ -69,27 +69,17 @@ func main() {
 	tcpAddr, err := net.ResolveTCPAddr("tcp", port)
 
 	if err != nil {
-		fmt.Println("<1>", err)
 		os.Exit(1)
 	}
 
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	if err != nil {
-		fmt.Println("<2>", err)
 		os.Exit(1)
 	}
 
 	fmt.Printf("Server started at address (%s) and port (%s)\n", listener.Addr().String(), port)
 
-	k := make(chan string)
-	for i := 0; i < 1; i++ {
-		fmt.Println("Created test")
-		go listen(listener, i, k)
-	}
-
-	for {
-		fmt.Println(<-k)
-	}
+	listen(listener)
 
 	os.Exit(0)
 
@@ -105,40 +95,38 @@ func cmp() int {
 	return ret
 }
 
-func listen(listener *net.TCPListener, i int, k chan string) {
+func listen(listener *net.TCPListener) {
 	for {
 		ma.Lock()
 		for cmp() == 1 {
 
 			cond.L.Lock()
-			k <- strconv.Itoa(i) + " WAITING" + ", Current threads: " + strconv.Itoa(currentWorkers)
+			fmt.Println(" WAITING" + ", Current threads: " + strconv.Itoa(currentWorkers))
 			cond.Wait()
 			cond.L.Unlock()
 		}
 
 		connection, err := listener.Accept()
 		if err != nil {
-			fmt.Println("<3>", err)
 			os.Exit(1)
 		}
 		currentWorkers = currentWorkers + 1
 		ma.Unlock()
-		go handleClient(connection, i, k)
+		go handleClient(connection)
 
 	}
 
 }
 
-func handleClient(connection net.Conn, i int, k chan string) {
+func handleClient(connection net.Conn) {
 
 	//fmt.Println("New connection from: ", connection.RemoteAddr())
 	defer connection.Close()
-	k <- strconv.Itoa(i) + ", New connection from: " + connection.RemoteAddr().String() + ", Current threads: " + strconv.Itoa(currentWorkers)
+	fmt.Println("New connection from: " + connection.RemoteAddr().String() + ", Current threads: " + strconv.Itoa(currentWorkers))
 	reader := bufio.NewReader(connection)
 	request, err := http.ReadRequest(reader)
 
 	if err != nil {
-		fmt.Println("<4> Error reading request: ", err.Error())
 		return
 	}
 
