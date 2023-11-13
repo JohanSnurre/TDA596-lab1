@@ -82,7 +82,7 @@ func main() {
 	fmt.Printf("Server started at address (%s) and port (%s)\n", listener.Addr().String(), port)
 
 	k := make(chan string)
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 1; i++ {
 		fmt.Println("Created test")
 		go listen(listener, i, k)
 	}
