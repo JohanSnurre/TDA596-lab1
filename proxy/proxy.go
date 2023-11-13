@@ -60,13 +60,11 @@ func main() {
 	tcpAddr, err := net.ResolveTCPAddr("tcp", port)
 
 	if err != nil {
-		fmt.Println("<1>", err)
 		os.Exit(1)
 	}
 
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	if err != nil {
-		fmt.Println("<2>", err)
 		os.Exit(1)
 	}
 
@@ -75,7 +73,6 @@ func main() {
 
 		connection, err := listener.Accept()
 		if err != nil {
-			fmt.Println("<3>", err)
 			os.Exit(1)
 		}
 
@@ -96,7 +93,8 @@ func handleClient(connection net.Conn, serverAddr string) {
 	request, err := http.ReadRequest(reader)
 
 	if err != nil {
-		fmt.Println("<4> Error reading request: ", err.Error())
+		res := response{statusCode[400], jsonType, jsonRes("Corrupted HTTP request-"+err.Error(), true)}
+		connection.Write([]byte(res.String()))
 		return
 	}
 
